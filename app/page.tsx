@@ -74,7 +74,9 @@ const getContrastYIQ = (hexcolor: string) => {
 };
 
 const CapabilityMap = () => {
-  const [capabilities, setCapabilities] = useState<Record<string, CapabilityData>>({});
+  const [capabilities, setCapabilities] = useState<
+    Record<string, CapabilityData>
+  >({});
   const [showHeatMap, setShowHeatMap] = useState<boolean>(true);
   const [maxLevel, setMaxLevel] = useState<number>(2); // Segmented button: 2,3,4
   const [searchQuery, setSearchQuery] = useState<string>(""); // Search query
@@ -82,6 +84,30 @@ const CapabilityMap = () => {
   const [error, setError] = useState<string | null>(null);
   const [level1Colors, setLevel1Colors] = useState<Record<string, string>>({}); // Background colors
   const [isColorPanelOpen, setIsColorPanelOpen] = useState<boolean>(false); // Bottom panel
+
+  // Updated list of default colors for Level 1 columns
+  const defaultColors = [
+    "#8B246E", // Vibrant Magenta
+    "#7A1C68", // Dark Magenta
+    "#7A1A1A", // Crimson Red
+    "#B34700", // Dark Orange
+    "#8B3E00", // Burnt Orange
+    "#A1421F", // Dark Coral
+    "#B8860B", // Dark Goldenrod
+    "#7D6608", // Mustard Yellow
+    "#6F4E37", // Golden Brown
+    "#2C6A0E", // Forest Green
+    "#556B2F", // Olive Green
+    "#394D2D", // Dark Moss Green
+    "#0F4C5C", // Teal Blue
+    "#003366", // Deep Blue
+    "#274B61", // Steel Blue
+    "#001F3F", // Navy Blue
+    "#3A306B", // Deep Purple
+    "#00205C", // Navy
+    "#001B4D", // Deep Navy
+    "#4B3069", // Dark Plum
+  ];
 
   // Effect to handle automatic toggle adjustments based on search
   useEffect(() => {
@@ -132,7 +158,9 @@ const CapabilityMap = () => {
   }, []);
 
   // Function to build nested capabilities from CSV rows
-  const buildNestedCapabilities = (rows: CSVRow[]): Record<string, CapabilityData> => {
+  const buildNestedCapabilities = (
+    rows: CSVRow[]
+  ): Record<string, CapabilityData> => {
     const capabilityMap: Record<string, CapabilityData> = {};
 
     rows.forEach((row) => {
@@ -256,8 +284,30 @@ const CapabilityMap = () => {
   ) => {
     const paddingClass = getPaddingClass(level);
 
+    // Tooltip positioning: always below the text
+    const tooltipPositionClass = "top-full mt-2 left-0";
+
+    // Determine margin-right for the heat map color box based on level
+    let heatmapMarginRight = "0px";
+    switch (level) {
+      case 1:
+        heatmapMarginRight = "39px";
+        break;
+      case 2:
+        heatmapMarginRight = "13px";
+        break;
+      case 3:
+        heatmapMarginRight = "4px";
+        break;
+      default:
+        heatmapMarginRight = "0px";
+    }
+
     return (
-      <div className={`flex items-center relative group ${className}`} style={style}>
+      <div
+        className={`flex items-center relative group ${className}`}
+        style={style}
+      >
         <div
           className={`flex-1 ${paddingClass} overflow-hidden overflow-ellipsis flex items-center`}
         >
@@ -267,12 +317,16 @@ const CapabilityMap = () => {
           </span>
           <span className="text-gray-500 ml-2">{data.id}</span>
         </div>
-        <div className="flex-shrink-0 ml-2">{renderScore(data.score)}</div>
+        <div
+          className="flex-shrink-0 ml-2"
+          style={{ marginRight: heatmapMarginRight }}
+        >
+          {renderScore(data.score)}
+        </div>
         {/* Tooltip */}
         <div
-          className="absolute z-10 bg-black text-white p-2 rounded text-xs -top-8 left-0 w-48 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
+          className={`absolute z-10 bg-black text-white p-2 rounded text-xs w-48 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none ${tooltipPositionClass}`}
           role="tooltip"
-          aria-hidden={!showHeatMap}
         >
           {data.desc}
         </div>
@@ -306,63 +360,71 @@ const CapabilityMap = () => {
       let hasChildMatch = false;
 
       if (level1Data.children) {
-        Object.entries(level1Data.children).forEach(([level2Name, level2Data]) => {
-          const level2Match =
-            level2Name.toLowerCase().includes(lowerCaseQuery) ||
-            level2Data.desc.toLowerCase().includes(lowerCaseQuery);
+        Object.entries(level1Data.children).forEach(
+          ([level2Name, level2Data]) => {
+            const level2Match =
+              level2Name.toLowerCase().includes(lowerCaseQuery) ||
+              level2Data.desc.toLowerCase().includes(lowerCaseQuery);
 
-          const filteredLevel2: CapabilityData = {
-            ...level2Data,
-            children: {},
-            matched: level2Match,
-          };
-          let hasGrandChildMatch = false;
+            const filteredLevel2: CapabilityData = {
+              ...level2Data,
+              children: {},
+              matched: level2Match,
+            };
+            let hasGrandChildMatch = false;
 
-          if (level2Data.children && maxLevel >= 3) {
-            Object.entries(level2Data.children).forEach(([level3Name, level3Data]) => {
-              if (maxLevel < 3) return; // Do not include Level3 if maxLevel <3
+            if (level2Data.children && maxLevel >= 3) {
+              Object.entries(level2Data.children).forEach(
+                ([level3Name, level3Data]) => {
+                  if (maxLevel < 3) return; // Do not include Level3 if maxLevel <3
 
-              const level3Match =
-                level3Name.toLowerCase().includes(lowerCaseQuery) ||
-                level3Data.desc.toLowerCase().includes(lowerCaseQuery);
+                  const level3Match =
+                    level3Name.toLowerCase().includes(lowerCaseQuery) ||
+                    level3Data.desc.toLowerCase().includes(lowerCaseQuery);
 
-              const filteredLevel3: CapabilityData = {
-                ...level3Data,
-                children: {},
-                matched: level3Match,
-              };
-              let hasGreatGrandChildMatch = false;
+                  const filteredLevel3: CapabilityData = {
+                    ...level3Data,
+                    children: {},
+                    matched: level3Match,
+                  };
+                  let hasGreatGrandChildMatch = false;
 
-              if (level3Data.children && maxLevel >= 4) {
-                Object.entries(level3Data.children).forEach(([level4Name, level4Data]) => {
-                  if (maxLevel < 4) return; // Do not include Level4 if maxLevel <4
+                  if (level3Data.children && maxLevel >= 4) {
+                    Object.entries(level3Data.children).forEach(
+                      ([level4Name, level4Data]) => {
+                        if (maxLevel < 4) return; // Do not include Level4 if maxLevel <4
 
-                  const level4Match =
-                    level4Name.toLowerCase().includes(lowerCaseQuery) ||
-                    level4Data.desc.toLowerCase().includes(lowerCaseQuery);
+                        const level4Match =
+                          level4Name.toLowerCase().includes(lowerCaseQuery) ||
+                          level4Data.desc
+                            .toLowerCase()
+                            .includes(lowerCaseQuery);
 
-                  if (level4Match) {
-                    filteredLevel3.children![level4Name] = {
-                      ...level4Data,
-                      matched: true,
-                    };
-                    hasGreatGrandChildMatch = true;
+                        if (level4Match) {
+                          filteredLevel3.children![level4Name] = {
+                            ...level4Data,
+                            matched: true,
+                          };
+                          hasGreatGrandChildMatch = true;
+                        }
+                      }
+                    );
                   }
-                });
-              }
 
-              if (level3Match || hasGreatGrandChildMatch) {
-                filteredLevel2.children![level3Name] = filteredLevel3;
-                hasGrandChildMatch = true;
-              }
-            });
-          }
+                  if (level3Match || hasGreatGrandChildMatch) {
+                    filteredLevel2.children![level3Name] = filteredLevel3;
+                    hasGrandChildMatch = true;
+                  }
+                }
+              );
+            }
 
-          if (level2Match || hasGrandChildMatch) {
-            filteredLevel1.children![level2Name] = filteredLevel2;
-            hasChildMatch = true;
+            if (level2Match || hasGrandChildMatch) {
+              filteredLevel1.children![level2Name] = filteredLevel2;
+              hasChildMatch = true;
+            }
           }
-        });
+        );
       }
 
       if (level1Match || hasChildMatch) {
@@ -377,6 +439,25 @@ const CapabilityMap = () => {
   const displayedCapabilities = useMemo(() => {
     return filterCapabilities(capabilities, searchQuery);
   }, [capabilities, searchQuery, maxLevel]);
+
+  // Compute default colors for Level 1 columns based on the number of columns
+  const defaultLevel1Colors = useMemo(() => {
+    const level1Domains = Object.keys(displayedCapabilities);
+    const N = level1Domains.length;
+    const M = defaultColors.length;
+    const defaultColorsForDomains: Record<string, string> = {};
+
+    if (N === 1) {
+      defaultColorsForDomains[level1Domains[0]] = defaultColors[0];
+    } else {
+      for (let i = 0; i < N; i++) {
+        const domain = level1Domains[i];
+        const colorIndex = Math.round((i * (M - 1)) / (N - 1));
+        defaultColorsForDomains[domain] = defaultColors[colorIndex];
+      }
+    }
+    return defaultColorsForDomains;
+  }, [displayedCapabilities]);
 
   // Function to render Level 4 capabilities
   const renderLevel4 = (capabilities: Record<string, CapabilityData>) => {
@@ -399,7 +480,9 @@ const CapabilityMap = () => {
           {capabilityData.children &&
             maxLevel >= 4 &&
             Object.keys(capabilityData.children).length > 0 && (
-              <div className="mt-2">{renderLevel4(capabilityData.children)}</div>
+              <div className="mt-2">
+                {renderLevel4(capabilityData.children)}
+              </div>
             )}
         </div>
       );
@@ -452,8 +535,7 @@ const CapabilityMap = () => {
     );
   }
 
-  // Calculate the number of Level 1 capabilities
-  const level1Count = Object.keys(displayedCapabilities).length;
+  // Removed the calculation of level1Count and the message displaying it
 
   return (
     <Card className="w-full">
@@ -525,39 +607,42 @@ const CapabilityMap = () => {
             </div>
           </div>
         </div>
-        {/* Displaying Search Results Count */}
-        <div className="mb-4">
-          <p className="text-sm text-gray-600">
-            Showing {level1Count} Level 1 {level1Count === 1 ? "capability" : "capabilities"}
-          </p>
-        </div>
+        {/* Removed the section displaying the "Showing X Level 1 capabilities" message */}
         {/* Capabilities Display */}
         <div className="flex gap-6 overflow-x-auto">
-          {Object.entries(displayedCapabilities).map(([domain, data]) => {
-            const rawColor = level1Colors[domain];
-            const backgroundColor = isValidHexColor(rawColor)
-              ? rawColor
-              : "transparent";
-            const textColor = getContrastYIQ(backgroundColor);
+          {Object.entries(displayedCapabilities).map(
+            ([domain, data], index) => {
+              const rawColor =
+                level1Colors[domain] || defaultLevel1Colors[domain];
+              const backgroundColor = isValidHexColor(rawColor)
+                ? rawColor
+                : "transparent";
 
-            return (
-              <div
-                key={domain}
-                className="border rounded p-4 flex flex-col min-w-[450px]"
-                style={{ backgroundColor }}
-              >
-                {renderCapabilityRow(domain, data, 1, "text-lg font-bold mb-4", {
-                  color: textColor,
-                })}
-                <div className="flex-1">
-                  {data.children &&
-                    Object.keys(data.children).length > 0 &&
-                    renderLevel2(data.children)}
+              return (
+                <div key={domain} className="flex flex-col">
+                  {/* Level 1 capability header */}
+                  {renderCapabilityRow(
+                    domain,
+                    data,
+                    1,
+                    "text-lg font-bold mb-4 text-center"
+                  )}
+                  {/* Column with Level 2 capabilities */}
+                  <div
+                    className="border rounded p-4 flex flex-col min-w-[450px]"
+                    style={{ backgroundColor }}
+                  >
+                    <div className="flex-1">
+                      {data.children &&
+                        Object.keys(data.children).length > 0 &&
+                        renderLevel2(data.children)}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            );
-          })}
-          {level1Count === 0 && (
+              );
+            }
+          )}
+          {Object.keys(displayedCapabilities).length === 0 && (
             <p className="text-gray-500">No capabilities match your search.</p>
           )}
         </div>
@@ -579,7 +664,9 @@ const CapabilityMap = () => {
             ></div>
             <div className="bg-white w-full max-w-md p-6 rounded-t-lg shadow-lg z-30">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-semibold">Customize Level 1 Colors</h2>
+                <h2 className="text-xl font-semibold">
+                  Customize Level 1 Colors
+                </h2>
                 <button
                   onClick={() => setIsColorPanelOpen(false)}
                   className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
@@ -589,7 +676,10 @@ const CapabilityMap = () => {
               </div>
               <div className="space-y-4 max-h-80 overflow-y-auto">
                 {Object.keys(capabilities).map((level1Name) => (
-                  <div key={level1Name} className="flex items-center justify-between">
+                  <div
+                    key={level1Name}
+                    className="flex items-center justify-between"
+                  >
                     <span className="font-medium">{level1Name}</span>
                     <div className="flex items-center">
                       <input
@@ -597,21 +687,27 @@ const CapabilityMap = () => {
                         value={
                           isValidHexColor(level1Colors[level1Name])
                             ? level1Colors[level1Name]
-                            : "#ffffff"
+                            : defaultLevel1Colors[level1Name] || "#ffffff"
                         }
-                        onChange={(e) => handleColorChange(level1Name, e.target.value)}
+                        onChange={(e) =>
+                          handleColorChange(level1Name, e.target.value)
+                        }
                         className="w-10 h-10 border rounded"
                       />
                       <input
                         type="text"
                         value={level1Colors[level1Name] || ""}
-                        onChange={(e) => handleColorChange(level1Name, e.target.value)}
+                        onChange={(e) =>
+                          handleColorChange(level1Name, e.target.value)
+                        }
                         className={`w-24 border rounded ml-2 ${
                           isValidHexColor(level1Colors[level1Name])
                             ? ""
                             : "border-red-500"
                         }`}
-                        placeholder="#ffffff"
+                        placeholder={
+                          defaultLevel1Colors[level1Name] || "#ffffff"
+                        }
                       />
                     </div>
                   </div>
