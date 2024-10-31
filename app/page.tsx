@@ -46,31 +46,56 @@ const getPaddingClass = (level: number) => {
   }
 };
 
+// Function to check if a string is a valid hex color
+const isValidHexColor = (hex: string): boolean => {
+  return /^#([0-9A-F]{3}){1,2}$/i.test(hex);
+};
+
+// Function to get appropriate text color based on background color
+const getContrastYIQ = (hexcolor: string) => {
+  hexcolor = hexcolor.replace("#", "");
+  if (hexcolor.length === 3) {
+    hexcolor =
+      hexcolor[0] +
+      hexcolor[0] +
+      hexcolor[1] +
+      hexcolor[1] +
+      hexcolor[2] +
+      hexcolor[2];
+  }
+  if (hexcolor.length !== 6) {
+    return "black"; // Default to black if invalid hex color
+  }
+  const r = parseInt(hexcolor.substr(0, 2), 16);
+  const g = parseInt(hexcolor.substr(2, 2), 16);
+  const b = parseInt(hexcolor.substr(4, 2), 16);
+  const yiq = (r * 299 + g * 587 + b * 114) / 1000;
+  return yiq >= 128 ? "black" : "white";
+};
+
 const CapabilityMap = () => {
-  const [capabilities, setCapabilities] = useState<
-    Record<string, CapabilityData>
-  >({});
+  const [capabilities, setCapabilities] = useState<Record<string, CapabilityData>>({});
   const [showHeatMap, setShowHeatMap] = useState<boolean>(true);
-  const [showL3, setShowL3] = useState<boolean>(true); // Toggle for Level 3
-  const [showL4, setShowL4] = useState<boolean>(true); // Toggle for Level 4
+  const [maxLevel, setMaxLevel] = useState<number>(2); // Segmented button: 2,3,4
   const [searchQuery, setSearchQuery] = useState<string>(""); // Search query
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [level1Colors, setLevel1Colors] = useState<Record<string, string>>({}); // Background colors
+  const [isColorPanelOpen, setIsColorPanelOpen] = useState<boolean>(false); // Bottom panel
 
   // Effect to handle automatic toggle adjustments based on search
   useEffect(() => {
     if (searchQuery.trim()) {
-      setShowL3(true);
-      setShowL4(true);
+      setMaxLevel(4);
     }
   }, [searchQuery]);
 
-  // Effect to handle unchecking Level 4 when Level 3 is unchecked
+  // Effect to handle unchecking maxLevel when necessary
   useEffect(() => {
-    if (!showL3 && showL4) {
-      setShowL4(false);
+    if (maxLevel < 3 && maxLevel < 4) {
+      // No action needed since maxLevel defines the limit
     }
-  }, [showL3, showL4]);
+  }, [maxLevel]);
 
   useEffect(() => {
     const fetchCSV = async () => {
@@ -107,9 +132,7 @@ const CapabilityMap = () => {
   }, []);
 
   // Function to build nested capabilities from CSV rows
-  const buildNestedCapabilities = (
-    rows: CSVRow[]
-  ): Record<string, CapabilityData> => {
+  const buildNestedCapabilities = (rows: CSVRow[]): Record<string, CapabilityData> => {
     const capabilityMap: Record<string, CapabilityData> = {};
 
     rows.forEach((row) => {
@@ -228,12 +251,13 @@ const CapabilityMap = () => {
     name: string,
     data: CapabilityData,
     level: number,
-    className = ""
+    className = "",
+    style: React.CSSProperties = {}
   ) => {
     const paddingClass = getPaddingClass(level);
 
     return (
-      <div className={`flex items-center relative ${className}`}>
+      <div className={`flex items-center relative group ${className}`} style={style}>
         <div
           className={`flex-1 ${paddingClass} overflow-hidden overflow-ellipsis flex items-center`}
         >
@@ -244,8 +268,9 @@ const CapabilityMap = () => {
           <span className="text-gray-500 ml-2">{data.id}</span>
         </div>
         <div className="flex-shrink-0 ml-2">{renderScore(data.score)}</div>
+        {/* Tooltip */}
         <div
-          className="absolute z-10 bg-black text-white p-2 rounded text-xs -top-8 left-0 w-48 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+          className="absolute z-10 bg-black text-white p-2 rounded text-xs -top-8 left-0 w-48 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
           role="tooltip"
           aria-hidden={!showHeatMap}
         >
@@ -255,7 +280,7 @@ const CapabilityMap = () => {
     );
   };
 
-  // Function to filter capabilities based on search query
+  // Function to filter capabilities based on search query and maxLevel
   const filterCapabilities = (
     capabilities: Record<string, CapabilityData>,
     query: string
@@ -281,67 +306,63 @@ const CapabilityMap = () => {
       let hasChildMatch = false;
 
       if (level1Data.children) {
-        Object.entries(level1Data.children).forEach(
-          ([level2Name, level2Data]) => {
-            const level2Match =
-              level2Name.toLowerCase().includes(lowerCaseQuery) ||
-              level2Data.desc.toLowerCase().includes(lowerCaseQuery);
+        Object.entries(level1Data.children).forEach(([level2Name, level2Data]) => {
+          const level2Match =
+            level2Name.toLowerCase().includes(lowerCaseQuery) ||
+            level2Data.desc.toLowerCase().includes(lowerCaseQuery);
 
-            const filteredLevel2: CapabilityData = {
-              ...level2Data,
-              children: {},
-              matched: level2Match,
-            };
-            let hasGrandChildMatch = false;
+          const filteredLevel2: CapabilityData = {
+            ...level2Data,
+            children: {},
+            matched: level2Match,
+          };
+          let hasGrandChildMatch = false;
 
-            if (level2Data.children && showL3) {
-              Object.entries(level2Data.children).forEach(
-                ([level3Name, level3Data]) => {
-                  const level3Match =
-                    level3Name.toLowerCase().includes(lowerCaseQuery) ||
-                    level3Data.desc.toLowerCase().includes(lowerCaseQuery);
+          if (level2Data.children && maxLevel >= 3) {
+            Object.entries(level2Data.children).forEach(([level3Name, level3Data]) => {
+              if (maxLevel < 3) return; // Do not include Level3 if maxLevel <3
 
-                  const filteredLevel3: CapabilityData = {
-                    ...level3Data,
-                    children: {},
-                    matched: level3Match,
-                  };
-                  let hasGreatGrandChildMatch = false;
+              const level3Match =
+                level3Name.toLowerCase().includes(lowerCaseQuery) ||
+                level3Data.desc.toLowerCase().includes(lowerCaseQuery);
 
-                  if (level3Data.children && showL4) {
-                    Object.entries(level3Data.children).forEach(
-                      ([level4Name, level4Data]) => {
-                        const level4Match =
-                          level4Name.toLowerCase().includes(lowerCaseQuery) ||
-                          level4Data.desc
-                            .toLowerCase()
-                            .includes(lowerCaseQuery);
+              const filteredLevel3: CapabilityData = {
+                ...level3Data,
+                children: {},
+                matched: level3Match,
+              };
+              let hasGreatGrandChildMatch = false;
 
-                        if (level4Match) {
-                          filteredLevel3.children![level4Name] = {
-                            ...level4Data,
-                            matched: true,
-                          };
-                          hasGreatGrandChildMatch = true;
-                        }
-                      }
-                    );
+              if (level3Data.children && maxLevel >= 4) {
+                Object.entries(level3Data.children).forEach(([level4Name, level4Data]) => {
+                  if (maxLevel < 4) return; // Do not include Level4 if maxLevel <4
+
+                  const level4Match =
+                    level4Name.toLowerCase().includes(lowerCaseQuery) ||
+                    level4Data.desc.toLowerCase().includes(lowerCaseQuery);
+
+                  if (level4Match) {
+                    filteredLevel3.children![level4Name] = {
+                      ...level4Data,
+                      matched: true,
+                    };
+                    hasGreatGrandChildMatch = true;
                   }
+                });
+              }
 
-                  if (level3Match || hasGreatGrandChildMatch) {
-                    filteredLevel2.children![level3Name] = filteredLevel3;
-                    hasGrandChildMatch = true;
-                  }
-                }
-              );
-            }
-
-            if (level2Match || hasGrandChildMatch) {
-              filteredLevel1.children![level2Name] = filteredLevel2;
-              hasChildMatch = true;
-            }
+              if (level3Match || hasGreatGrandChildMatch) {
+                filteredLevel2.children![level3Name] = filteredLevel3;
+                hasGrandChildMatch = true;
+              }
+            });
           }
-        );
+
+          if (level2Match || hasGrandChildMatch) {
+            filteredLevel1.children![level2Name] = filteredLevel2;
+            hasChildMatch = true;
+          }
+        });
       }
 
       if (level1Match || hasChildMatch) {
@@ -355,7 +376,7 @@ const CapabilityMap = () => {
   // Memoize the filtered capabilities for performance
   const displayedCapabilities = useMemo(() => {
     return filterCapabilities(capabilities, searchQuery);
-  }, [capabilities, searchQuery, showL3, showL4]);
+  }, [capabilities, searchQuery, maxLevel]);
 
   // Function to render Level 4 capabilities
   const renderLevel4 = (capabilities: Record<string, CapabilityData>) => {
@@ -368,19 +389,17 @@ const CapabilityMap = () => {
 
   // Function to render Level 3 capabilities
   const renderLevel3 = (capabilities: Record<string, CapabilityData>) => {
-    if (!showL3) return null;
+    if (maxLevel < 3) return null;
 
     return Object.entries(capabilities).map(([name, data]) => {
       const capabilityData = data as CapabilityData;
       return (
-        <div key={name} className="p-2 border rounded mb-4">
+        <div key={name} className="p-2 border rounded">
           {renderCapabilityRow(name, capabilityData, 3, "text-sm font-medium")}
           {capabilityData.children &&
-            showL4 &&
+            maxLevel >= 4 &&
             Object.keys(capabilityData.children).length > 0 && (
-              <div className="mt-2">
-                {renderLevel4(capabilityData.children)}
-              </div>
+              <div className="mt-2">{renderLevel4(capabilityData.children)}</div>
             )}
         </div>
       );
@@ -403,6 +422,14 @@ const CapabilityMap = () => {
         </div>
       );
     });
+  };
+
+  // Handler for setting background color of Level1 capabilities
+  const handleColorChange = (level1Name: string, color: string) => {
+    setLevel1Colors((prevColors) => ({
+      ...prevColors,
+      [level1Name]: color,
+    }));
   };
 
   if (loading) {
@@ -431,7 +458,7 @@ const CapabilityMap = () => {
   return (
     <Card className="w-full">
       <CardContent className="p-6">
-        {/* Header Section with Title and Toggles */}
+        {/* Header Section with Title and Controls */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 space-y-4 md:space-y-0">
           <h1 className="text-2xl font-bold whitespace-nowrap">
             Dental Practice Capability Model
@@ -447,7 +474,7 @@ const CapabilityMap = () => {
                 className="px-3 py-2 border rounded-md focus:outline-none focus:ring focus:border-blue-300"
               />
             </div>
-            {/* Toggles */}
+            {/* Toggles and Segmented Button Group */}
             <div className="flex items-center space-x-4">
               {/* Heat Map Toggle */}
               <label className="flex items-center space-x-2">
@@ -459,57 +486,148 @@ const CapabilityMap = () => {
                 />
                 <span className="text-sm">Show Heat Map</span>
               </label>
-              {/* Level 3 Toggle */}
-              <label className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  checked={showL3}
-                  onChange={() => setShowL3((prev: boolean) => !prev)}
-                  className="rounded border-gray-300"
+              {/* Segmented Button Group for Levels */}
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => setMaxLevel(2)}
+                  className={`px-4 py-2 rounded ${
+                    maxLevel === 2
+                      ? "bg-blue-500 text-white"
+                      : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                  }`}
                   disabled={searchQuery.trim() !== ""}
-                />
-                <span className="text-sm">Show Level 3</span>
-              </label>
-              {/* Level 4 Toggle */}
-              <label className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  checked={showL4}
-                  onChange={() => setShowL4((prev: boolean) => !prev)}
-                  className="rounded border-gray-300"
+                >
+                  Level 2
+                </button>
+                <button
+                  onClick={() => setMaxLevel(3)}
+                  className={`px-4 py-2 rounded ${
+                    maxLevel === 3
+                      ? "bg-blue-500 text-white"
+                      : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                  }`}
                   disabled={searchQuery.trim() !== ""}
-                />
-                <span className="text-sm">Show Level 4</span>
-              </label>
+                >
+                  Level 3
+                </button>
+                <button
+                  onClick={() => setMaxLevel(4)}
+                  className={`px-4 py-2 rounded ${
+                    maxLevel === 4
+                      ? "bg-blue-500 text-white"
+                      : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                  }`}
+                  disabled={searchQuery.trim() !== ""}
+                >
+                  Level 4
+                </button>
+              </div>
             </div>
           </div>
         </div>
         {/* Displaying Search Results Count */}
         <div className="mb-4">
           <p className="text-sm text-gray-600">
-            Showing {level1Count} Level 1{" "}
-            {level1Count === 1 ? "capability" : "capabilities"}
+            Showing {level1Count} Level 1 {level1Count === 1 ? "capability" : "capabilities"}
           </p>
         </div>
         {/* Capabilities Display */}
         <div className="flex gap-6 overflow-x-auto">
-          {Object.entries(displayedCapabilities).map(([domain, data]) => (
-            <div
-              key={domain}
-              className="border rounded p-4 flex flex-col min-w-[450px]"
-            >
-              {renderCapabilityRow(domain, data, 1, "text-lg font-bold mb-4")}
-              <div className="flex-1">
-                {data.children &&
-                  Object.keys(data.children).length > 0 &&
-                  renderLevel2(data.children)}
+          {Object.entries(displayedCapabilities).map(([domain, data]) => {
+            const rawColor = level1Colors[domain];
+            const backgroundColor = isValidHexColor(rawColor)
+              ? rawColor
+              : "transparent";
+            const textColor = getContrastYIQ(backgroundColor);
+
+            return (
+              <div
+                key={domain}
+                className="border rounded p-4 flex flex-col min-w-[450px]"
+                style={{ backgroundColor }}
+              >
+                {renderCapabilityRow(domain, data, 1, "text-lg font-bold mb-4", {
+                  color: textColor,
+                })}
+                <div className="flex-1">
+                  {data.children &&
+                    Object.keys(data.children).length > 0 &&
+                    renderLevel2(data.children)}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
           {level1Count === 0 && (
             <p className="text-gray-500">No capabilities match your search.</p>
           )}
         </div>
+        {/* Button to Open Color Panel */}
+        <div className="mt-6 flex justify-end">
+          <button
+            onClick={() => setIsColorPanelOpen(true)}
+            className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+          >
+            Customize Colors
+          </button>
+        </div>
+        {/* Bottom Panel for Color Customization */}
+        {isColorPanelOpen && (
+          <div className="fixed inset-0 flex justify-center items-end z-20">
+            <div
+              className="fixed inset-0 bg-black opacity-50"
+              onClick={() => setIsColorPanelOpen(false)}
+            ></div>
+            <div className="bg-white w-full max-w-md p-6 rounded-t-lg shadow-lg z-30">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-semibold">Customize Level 1 Colors</h2>
+                <button
+                  onClick={() => setIsColorPanelOpen(false)}
+                  className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
+                >
+                  ×
+                </button>
+              </div>
+              <div className="space-y-4 max-h-80 overflow-y-auto">
+                {Object.keys(capabilities).map((level1Name) => (
+                  <div key={level1Name} className="flex items-center justify-between">
+                    <span className="font-medium">{level1Name}</span>
+                    <div className="flex items-center">
+                      <input
+                        type="color"
+                        value={
+                          isValidHexColor(level1Colors[level1Name])
+                            ? level1Colors[level1Name]
+                            : "#ffffff"
+                        }
+                        onChange={(e) => handleColorChange(level1Name, e.target.value)}
+                        className="w-10 h-10 border rounded"
+                      />
+                      <input
+                        type="text"
+                        value={level1Colors[level1Name] || ""}
+                        onChange={(e) => handleColorChange(level1Name, e.target.value)}
+                        className={`w-24 border rounded ml-2 ${
+                          isValidHexColor(level1Colors[level1Name])
+                            ? ""
+                            : "border-red-500"
+                        }`}
+                        placeholder="#ffffff"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-6 flex justify-end">
+                <button
+                  onClick={() => setIsColorPanelOpen(false)}
+                  className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
