@@ -1,10 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent } from "@/app/components/ui/card";
+
+type CapabilityData = {
+  id: string;
+  desc: string;
+  score?: number;
+  children?: Record<string, CapabilityData>;
+};
 
 const CapabilityMap = () => {
-  const [capabilities] = useState({
+  const [capabilities] = useState<Record<string, CapabilityData>>({
     "Patient Acquisition": {
       id: "1",
       desc: "Activities focused on attracting new patients to the dental practice.",
@@ -103,32 +110,38 @@ const CapabilityMap = () => {
 
   const [showHeatMap, setShowHeatMap] = useState(true);
 
-  const getScoreColor = (score) => {
+  const getScoreColor = (score: number) => {
     if (!score && score !== 0) return "bg-gray-400";
     if (score >= 85) return "bg-green-500";
     if (score >= 70) return "bg-yellow-500";
     return "bg-red-500";
   };
 
-  const renderScore = (score) =>
+  const renderScore = (score: number) =>
     showHeatMap ? (
       <div className={`w-8 h-8 rounded ${getScoreColor(score)}`}></div>
     ) : null;
 
-  const renderCapabilityRow = (name, data, className = "") => (
+  const renderCapabilityRow = (
+    name: string,
+    data: CapabilityData,
+    className = ""
+  ) => (
     <div className={`flex items-center group relative ${className}`}>
       <div className="flex-1">
         <span>{name}</span>
         <span className="text-gray-500 ml-2">{data.id}</span>
       </div>
-      <div className="w-16 flex justify-center">{renderScore(data.score)}</div>
+      <div className="w-16 flex justify-center">
+        {renderScore(data.score ?? 0)}
+      </div>
       <div className="hidden group-hover:block absolute z-10 bg-black text-white p-2 rounded text-xs -top-8 left-0 w-48">
         {data.desc}
       </div>
     </div>
   );
 
-  const renderLevel4 = (capabilities) => {
+  const renderLevel4 = (capabilities: Record<string, CapabilityData>) => {
     return Object.entries(capabilities).map(([name, data]) => (
       <div key={name} className="p-1 border-l-2 border-gray-200 ml-2">
         {renderCapabilityRow(name, data, "text-xs")}
@@ -136,26 +149,32 @@ const CapabilityMap = () => {
     ));
   };
 
-  const renderLevel3 = (capabilities) => {
-    return Object.entries(capabilities).map(([name, data]) => (
-      <div key={name} className="p-2 border rounded">
-        {renderCapabilityRow(name, data, "text-sm font-medium")}
-        {data.children && (
-          <div className="mt-2">{renderLevel4(data.children)}</div>
-        )}
-      </div>
-    ));
+  const renderLevel3 = (capabilities: Record<string, CapabilityData>) => {
+    return Object.entries(capabilities).map(([name, data]) => {
+      const capabilityData = data as CapabilityData;
+      return (
+        <div key={name} className="p-2 border rounded">
+          {renderCapabilityRow(name, capabilityData, "text-sm font-medium")}
+          {capabilityData.children && (
+            <div className="mt-2">{renderLevel4(capabilityData.children)}</div>
+          )}
+        </div>
+      );
+    });
   };
 
-  const renderLevel2 = (capabilities) => {
-    return Object.entries(capabilities).map(([name, data]) => (
-      <div key={name} className="border rounded p-2 bg-gray-50">
-        {renderCapabilityRow(name, data, "font-medium mb-2")}
-        <div className="grid grid-cols-1 gap-2">
-          {data.children && renderLevel3(data.children)}
+  const renderLevel2 = (capabilities: Record<string, CapabilityData>) => {
+    return Object.entries(capabilities).map(([name, data]) => {
+      const capabilityData = data as CapabilityData;
+      return (
+        <div key={name} className="border rounded p-2 bg-gray-50">
+          {renderCapabilityRow(name, capabilityData, "font-medium mb-2")}
+          <div className="grid grid-cols-1 gap-2">
+            {capabilityData.children && renderLevel3(capabilityData.children)}
+          </div>
         </div>
-      </div>
-    ));
+      );
+    });
   };
 
   return (
