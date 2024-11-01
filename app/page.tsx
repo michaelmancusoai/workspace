@@ -535,8 +535,6 @@ const CapabilityMap = () => {
     );
   }
 
-  // Removed the calculation of level1Count and the message displaying it
-
   return (
     <Card className="w-full">
       <CardContent className="p-6">
@@ -607,7 +605,6 @@ const CapabilityMap = () => {
             </div>
           </div>
         </div>
-        {/* Removed the section displaying the "Showing X Level 1 capabilities" message */}
         {/* Capabilities Display */}
         <div className="flex gap-6 overflow-x-auto">
           {Object.entries(displayedCapabilities).map(
@@ -625,7 +622,7 @@ const CapabilityMap = () => {
                     domain,
                     data,
                     1,
-                    "text-lg font-bold mb-4 text-center"
+                    "text-3xl font-bold mb-4 text-center"
                   )}
                   {/* Column with Level 2 capabilities */}
                   <div
