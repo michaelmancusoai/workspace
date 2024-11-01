@@ -1,13 +1,14 @@
-// tailwind.config.ts
+// tailwind.config.js
 
-import type { Config } from "tailwindcss";
+// Removed TypeScript type import as it's no longer needed
+// import type { Config } from "tailwindcss";
 
-const config: Config = {
+const config = {
   darkMode: ["class"],
   content: [
-    "./pages/**/*.{js,ts,jsx,tsx,mdx}",
-    "./components/**/*.{js,ts,jsx,tsx,mdx}",
-    "./app/**/*.{js,ts,jsx,tsx,mdx}",
+    "./pages/**/*.{js,jsx,ts,tsx,mdx}",
+    "./components/**/*.{js,jsx,ts,tsx,mdx}",
+    "./app/**/*.{js,jsx,ts,tsx,mdx}",
   ],
   theme: {
     container: {
@@ -82,4 +83,5 @@ const config: Config = {
   plugins: [require("tailwindcss-animate")],
 };
 
-export default config;
+// Changed from TypeScript export to CommonJS
+module.exports = config;

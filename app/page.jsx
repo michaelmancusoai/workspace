@@ -1,37 +1,11 @@
-"use client";
+"use client"; // Indicates that this component should be rendered on the client side
 
 import { useEffect, useState, useMemo } from "react";
-import { Card, CardContent } from "@/app/components/ui/card";
-import Papa, { ParseResult } from "papaparse";
+import { Card, CardContent } from "/app/components/ui/card";
+import Papa from "papaparse"; // Removed type import { ParseResult } from "papaparse"
 
-// Define the structure of each capability
-type CapabilityData = {
-  id: string;
-  desc: string;
-  score: number; // Score is now required and comes from CSV
-  children?: Record<string, CapabilityData>; // Nested child capabilities
-  matched?: boolean; // Indicates if this node matches the search
-};
-
-// Define the structure of each CSV row
-type CSVRow = {
-  Level1: string;
-  Level1_ID: string;
-  Level1_Desc: string;
-  Level2?: string;
-  Level2_ID?: string;
-  Level2_Desc?: string;
-  Level3?: string;
-  Level3_ID?: string;
-  Level3_Desc?: string;
-  Level4?: string;
-  Level4_ID?: string;
-  Level4_Desc?: string;
-  Score: number; // New Score field
-};
-
-// Function to map level to padding classes for indentation
-const getPaddingClass = (level: number) => {
+// Define the structure of each capability (Removed TypeScript type)
+const getPaddingClass = (level) => {
   switch (level) {
     case 1:
       return "pl-2";
@@ -47,12 +21,12 @@ const getPaddingClass = (level: number) => {
 };
 
 // Function to check if a string is a valid hex color
-const isValidHexColor = (hex: string): boolean => {
+const isValidHexColor = (hex) => {
   return /^#([0-9A-F]{3}){1,2}$/i.test(hex);
 };
 
 // Function to get appropriate text color based on background color for contrast
-const getContrastYIQ = (hexcolor: string) => {
+const getContrastYIQ = (hexcolor) => {
   hexcolor = hexcolor.replace("#", "");
   // Expand shorthand hex color to full form if necessary
   if (hexcolor.length === 3) {
@@ -78,23 +52,21 @@ const getContrastYIQ = (hexcolor: string) => {
 
 const CapabilityMap = () => {
   // State to hold the nested capabilities data
-  const [capabilities, setCapabilities] = useState<
-    Record<string, CapabilityData>
-  >({});
+  const [capabilities, setCapabilities] = useState({}); // Removed TypeScript type annotation
   // State to toggle heatmap display
-  const [showHeatMap, setShowHeatMap] = useState<boolean>(true);
+  const [showHeatMap, setShowHeatMap] = useState(true); // Removed TypeScript type annotation
   // State to control the maximum level displayed (2, 3, or 4)
-  const [maxLevel, setMaxLevel] = useState<number>(2);
+  const [maxLevel, setMaxLevel] = useState(2); // Removed TypeScript type annotation
   // State for search query input
-  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [searchQuery, setSearchQuery] = useState(""); // Removed TypeScript type annotation
   // State to handle loading status
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState(true); // Removed TypeScript type annotation
   // State to handle error messages
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState(null); // Removed TypeScript type annotation
   // State to store custom background colors for Level 1 capabilities
-  const [level1Colors, setLevel1Colors] = useState<Record<string, string>>({});
+  const [level1Colors, setLevel1Colors] = useState({}); // Removed TypeScript type annotation
   // State to control the visibility of the color customization panel
-  const [isColorPanelOpen, setIsColorPanelOpen] = useState<boolean>(false);
+  const [isColorPanelOpen, setIsColorPanelOpen] = useState(false); // Removed TypeScript type annotation
 
   // List of default colors for Level 1 columns
   const defaultColors = [
@@ -144,25 +116,25 @@ const CapabilityMap = () => {
         }
         const csvText = await response.text();
         // Parse the CSV using PapaParse
-        Papa.parse<CSVRow>(csvText, {
+        Papa.parse(csvText, {
           header: true, // Use the first row as headers
           skipEmptyLines: true, // Skip empty lines
           dynamicTyping: {
             Score: true, // Parse 'Score' as a number
           },
-          complete: (results: ParseResult<CSVRow>) => {
+          complete: (results) => {
             const data = results.data;
             // Build nested capabilities from parsed CSV data
             const nestedData = buildNestedCapabilities(data);
             setCapabilities(nestedData); // Update state with nested data
             setLoading(false); // Set loading to false after data is loaded
           },
-          error: (err: any) => {
+          error: (err) => {
             setError(err.message || "Error parsing CSV"); // Handle parsing errors
             setLoading(false);
           },
         });
-      } catch (err: any) {
+      } catch (err) {
         setError(err.message || "Error fetching CSV"); // Handle fetch errors
         setLoading(false);
       }
@@ -176,10 +148,8 @@ const CapabilityMap = () => {
    * @param rows - Array of CSVRow objects
    * @returns Nested Record of CapabilityData
    */
-  const buildNestedCapabilities = (
-    rows: CSVRow[]
-  ): Record<string, CapabilityData> => {
-    const capabilityMap: Record<string, CapabilityData> = {};
+  const buildNestedCapabilities = (rows) => {
+    const capabilityMap = {};
 
     rows.forEach((row) => {
       const {
@@ -215,8 +185,8 @@ const CapabilityMap = () => {
 
       // Handle Level2 capabilities
       if (Level2) {
-        if (!level1.children![Level2]) {
-          level1.children![Level2] = {
+        if (!level1.children[Level2]) {
+          level1.children[Level2] = {
             id: Level2_ID || "",
             desc: Level2_Desc || "",
             score: 0, // Initialize score to 0 by default
@@ -224,12 +194,12 @@ const CapabilityMap = () => {
           };
         }
 
-        const level2 = level1.children![Level2];
+        const level2 = level1.children[Level2];
 
         // Handle Level3 capabilities
         if (Level3) {
-          if (!level2.children![Level3]) {
-            level2.children![Level3] = {
+          if (!level2.children[Level3]) {
+            level2.children[Level3] = {
               id: Level3_ID || "",
               desc: Level3_Desc || "",
               score: 0, // Initialize score to 0 by default
@@ -237,19 +207,19 @@ const CapabilityMap = () => {
             };
           }
 
-          const level3 = level2.children![Level3];
+          const level3 = level2.children[Level3];
 
           // Handle Level4 capabilities
           if (Level4) {
-            if (!level3.children![Level4]) {
-              level3.children![Level4] = {
+            if (!level3.children[Level4]) {
+              level3.children[Level4] = {
                 id: Level4_ID || "",
                 desc: Level4_Desc || "",
                 score: Number(Score), // Ensure Score is a number
               };
             } else {
               // If Level4 already exists, update the score
-              level3.children![Level4].score = Number(Score);
+              level3.children[Level4].score = Number(Score);
             }
           }
         }
@@ -264,7 +234,7 @@ const CapabilityMap = () => {
    * @param score - Numeric score value
    * @returns Tailwind CSS class for background color
    */
-  const getScoreColor = (score: number) => {
+  const getScoreColor = (score) => {
     if (score === 0) return "bg-gray-400"; // Map score 0 to gray
     if (score >= 85) return "bg-green-500"; // High score - green
     if (score >= 70) return "bg-yellow-500"; // Medium score - yellow
@@ -276,7 +246,7 @@ const CapabilityMap = () => {
    * @param score - Numeric score value
    * @returns JSX element representing the score heatmap
    */
-  const renderScore = (score: number) =>
+  const renderScore = (score) =>
     showHeatMap ? (
       <div className={`w-8 h-8 rounded ${getScoreColor(score)}`}></div>
     ) : null;
@@ -287,7 +257,7 @@ const CapabilityMap = () => {
    * @param query - The search query
    * @returns JSX element with highlighted matching parts
    */
-  const highlightText = (text: string, query: string) => {
+  const highlightText = (text, query) => {
     if (!query) return text; // Return original text if no query
     const regex = new RegExp(`(${query})`, "gi"); // Create regex for case-insensitive match
     const parts = text.split(regex); // Split text by matching parts
@@ -317,11 +287,11 @@ const CapabilityMap = () => {
    * @returns JSX element representing the capability row
    */
   const renderCapabilityRow = (
-    name: string,
-    data: CapabilityData,
-    level: number,
+    name,
+    data,
+    level,
     className = "",
-    style: React.CSSProperties = {}
+    style = {}
   ) => {
     const paddingClass = getPaddingClass(level); // Get padding based on level
 
@@ -383,14 +353,11 @@ const CapabilityMap = () => {
    * @param query - Search query string
    * @returns Filtered nested capabilities data
    */
-  const filterCapabilities = (
-    capabilities: Record<string, CapabilityData>,
-    query: string
-  ): Record<string, CapabilityData> => {
+  const filterCapabilities = (capabilities, query) => {
     if (!query.trim()) return capabilities; // Return all capabilities if query is empty
 
     const lowerCaseQuery = query.toLowerCase(); // Convert query to lowercase for case-insensitive search
-    const filtered: Record<string, CapabilityData> = {};
+    const filtered = {};
 
     // Iterate over each Level1 capability
     Object.entries(capabilities).forEach(([level1Name, level1Data]) => {
@@ -400,7 +367,7 @@ const CapabilityMap = () => {
         level1Data.desc.toLowerCase().includes(lowerCaseQuery);
 
       // Initialize a filtered Level1 capability
-      const filteredLevel1: CapabilityData = {
+      const filteredLevel1 = {
         ...level1Data,
         children: {},
         matched: level1Match,
@@ -417,7 +384,7 @@ const CapabilityMap = () => {
               level2Data.desc.toLowerCase().includes(lowerCaseQuery);
 
             // Initialize a filtered Level2 capability
-            const filteredLevel2: CapabilityData = {
+            const filteredLevel2 = {
               ...level2Data,
               children: {},
               matched: level2Match,
@@ -436,7 +403,7 @@ const CapabilityMap = () => {
                     level3Data.desc.toLowerCase().includes(lowerCaseQuery);
 
                   // Initialize a filtered Level3 capability
-                  const filteredLevel3: CapabilityData = {
+                  const filteredLevel3 = {
                     ...level3Data,
                     children: {},
                     matched: level3Match,
@@ -458,7 +425,7 @@ const CapabilityMap = () => {
 
                         if (level4Match) {
                           // If Level4 matches, include it in the filtered data
-                          filteredLevel3.children![level4Name] = {
+                          filteredLevel3.children[level4Name] = {
                             ...level4Data,
                             matched: true,
                           };
@@ -470,7 +437,7 @@ const CapabilityMap = () => {
 
                   // If Level3 matches or any of its children match, include it
                   if (level3Match || hasGreatGrandChildMatch) {
-                    filteredLevel2.children![level3Name] = filteredLevel3;
+                    filteredLevel2.children[level3Name] = filteredLevel3;
                     hasGrandChildMatch = true;
                   }
                 }
@@ -479,7 +446,7 @@ const CapabilityMap = () => {
 
             // If Level2 matches or any of its children match, include it
             if (level2Match || hasGrandChildMatch) {
-              filteredLevel1.children![level2Name] = filteredLevel2;
+              filteredLevel1.children[level2Name] = filteredLevel2;
               hasChildMatch = true;
             }
           }
@@ -508,7 +475,7 @@ const CapabilityMap = () => {
     const level1Domains = Object.keys(displayedCapabilities); // Get all Level1 names
     const N = level1Domains.length; // Number of Level1 capabilities
     const M = defaultColors.length; // Number of default colors available
-    const defaultColorsForDomains: Record<string, string> = {};
+    const defaultColorsForDomains = {};
 
     if (N === 1) {
       // If only one Level1, assign the first default color
@@ -529,7 +496,7 @@ const CapabilityMap = () => {
    * @param capabilities - Level4 capabilities data
    * @returns Array of JSX elements representing Level4 capabilities
    */
-  const renderLevel4 = (capabilities: Record<string, CapabilityData>) => {
+  const renderLevel4 = (capabilities) => {
     return Object.entries(capabilities).map(([name, data]) => (
       <div key={name} className="p-1 border-l-2 border-gray-200 ml-2">
         {renderCapabilityRow(name, data, 4, "text-xs")}
@@ -542,21 +509,18 @@ const CapabilityMap = () => {
    * @param capabilities - Level3 capabilities data
    * @returns Array of JSX elements representing Level3 capabilities
    */
-  const renderLevel3 = (capabilities: Record<string, CapabilityData>) => {
+  const renderLevel3 = (capabilities) => {
     if (maxLevel < 3) return null; // Do not render if maxLevel is less than 3
 
     return Object.entries(capabilities).map(([name, data]) => {
-      const capabilityData = data as CapabilityData;
       return (
         <div key={name} className="p-2 border rounded">
-          {renderCapabilityRow(name, capabilityData, 3, "text-sm font-medium")}
+          {renderCapabilityRow(name, data, 3, "text-sm font-medium")}
           {/* Render Level4 capabilities if available and maxLevel allows */}
-          {capabilityData.children &&
+          {data.children &&
             maxLevel >= 4 &&
-            Object.keys(capabilityData.children).length > 0 && (
-              <div className="mt-2">
-                {renderLevel4(capabilityData.children)}
-              </div>
+            Object.keys(data.children).length > 0 && (
+              <div className="mt-2">{renderLevel4(data.children)}</div>
             )}
         </div>
       );
@@ -568,19 +532,17 @@ const CapabilityMap = () => {
    * @param capabilities - Level2 capabilities data
    * @returns Array of JSX elements representing Level2 capabilities
    */
-  const renderLevel2 = (capabilities: Record<string, CapabilityData>) => {
+  const renderLevel2 = (capabilities) => {
     return Object.entries(capabilities).map(([name, data]) => {
-      const capabilityData = data as CapabilityData;
       return (
         <div key={name} className="border rounded p-2 bg-gray-50 mb-4">
-          {renderCapabilityRow(name, capabilityData, 2, "font-medium mb-2")}
+          {renderCapabilityRow(name, data, 2, "font-medium mb-2")}
           {/* Render Level3 capabilities if available */}
-          {capabilityData.children &&
-            Object.keys(capabilityData.children).length > 0 && (
-              <div className="grid grid-cols-1 gap-2">
-                {renderLevel3(capabilityData.children)}
-              </div>
-            )}
+          {data.children && Object.keys(data.children).length > 0 && (
+            <div className="grid grid-cols-1 gap-2">
+              {renderLevel3(data.children)}
+            </div>
+          )}
         </div>
       );
     });
@@ -591,7 +553,7 @@ const CapabilityMap = () => {
    * @param level1Name - Name of the Level1 capability
    * @param color - New color value
    */
-  const handleColorChange = (level1Name: string, color: string) => {
+  const handleColorChange = (level1Name, color) => {
     setLevel1Colors((prevColors) => ({
       ...prevColors,
       [level1Name]: color,
@@ -648,7 +610,7 @@ const CapabilityMap = () => {
                 <input
                   type="checkbox"
                   checked={showHeatMap}
-                  onChange={() => setShowHeatMap((prev: boolean) => !prev)}
+                  onChange={() => setShowHeatMap((prev) => !prev)}
                   className="rounded border-gray-300"
                 />
                 <span className="text-sm">Show Heat Map</span>
