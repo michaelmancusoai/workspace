@@ -101,17 +101,15 @@ const isValidHexColor = (hex) => {
 
 // CapabilityMap Component
 const CapabilityMap = ({
+  capabilities,
+  loading,
+  error,
   searchQuery,
   showHeatMap,
   maxLevel,
   level1Colors,
   handleColorChange,
 }) => {
-  // State Variables
-  const [capabilities, setCapabilities] = useState({});
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
   // List of default colors for Level 1 columns
   const defaultColors = useMemo(
     () => [
@@ -520,45 +518,6 @@ const CapabilityMap = ({
     );
   };
 
-  /**
-   * Function to fetch and parse the CSV data
-   */
-  useEffect(() => {
-    const fetchCSV = async () => {
-      try {
-        const response = await fetch("/business-capabilities.csv"); // Fetch the CSV file
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const csvText = await response.text();
-        // Parse the CSV using PapaParse
-        Papa.parse(csvText, {
-          header: true, // Use the first row as headers
-          skipEmptyLines: true, // Skip empty lines
-          dynamicTyping: {
-            Score: true, // Parse 'Score' as a number
-          },
-          complete: (results) => {
-            const data = results.data;
-            // Build nested capabilities from parsed CSV data
-            const nestedData = buildNestedCapabilities(data);
-            setCapabilities(nestedData); // Update state with nested data
-            setLoading(false); // Set loading to false after data is loaded
-          },
-          error: (err) => {
-            setError(err.message || "Error parsing CSV"); // Handle parsing errors
-            setLoading(false);
-          },
-        });
-      } catch (err) {
-        setError(err.message || "Error fetching CSV"); // Handle fetch errors
-        setLoading(false);
-      }
-    };
-
-    fetchCSV(); // Initiate CSV fetch on mount
-  }, []);
-
   // Render loading state
   if (loading) {
     return (
@@ -634,6 +593,9 @@ export default function Page() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isColorPanelOpen, setIsColorPanelOpen] = useState(false);
   const [level1Colors, setLevel1Colors] = useState({});
+  const [capabilities, setCapabilities] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   // List of default colors for Level 1 columns
   const defaultColors = useMemo(
@@ -675,15 +637,449 @@ export default function Page() {
   };
 
   /**
+   * Function to fetch and parse the CSV data
+   */
+  useEffect(() => {
+    const fetchCSV = async () => {
+      try {
+        const response = await fetch("/business-capabilities.csv"); // Fetch the CSV file
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const csvText = await response.text();
+        // Parse the CSV using PapaParse
+        Papa.parse(csvText, {
+          header: true, // Use the first row as headers
+          skipEmptyLines: true, // Skip empty lines
+          dynamicTyping: {
+            Score: true, // Parse 'Score' as a number
+          },
+          complete: (results) => {
+            const data = results.data;
+            // Build nested capabilities from parsed CSV data
+            const nestedData = buildNestedCapabilities(data);
+            setCapabilities(nestedData); // Update state with nested data
+            setLoading(false); // Set loading to false after data is loaded
+          },
+          error: (err) => {
+            setError(err.message || "Error parsing CSV"); // Handle parsing errors
+            setLoading(false);
+          },
+        });
+      } catch (err) {
+        setError(err.message || "Error fetching CSV"); // Handle fetch errors
+        setLoading(false);
+      }
+    };
+
+    fetchCSV(); // Initiate CSV fetch on mount
+  }, []);
+
+  /**
+   * Builds nested capabilities from CSV rows.
+   * @param {Array} rows - The array of CSV row objects.
+   * @returns {object} - The nested capabilities object.
+   */
+  const buildNestedCapabilities = (rows) => {
+    const capabilityMap = {};
+
+    rows.forEach((row) => {
+      const {
+        Level1,
+        Level1_ID,
+        Level1_Desc,
+        Level2,
+        Level2_ID,
+        Level2_Desc,
+        Level3,
+        Level3_ID,
+        Level3_Desc,
+        Level4,
+        Level4_ID,
+        Level4_Desc,
+        Score,
+      } = row;
+
+      if (!Level1) return; // Skip if Level1 is missing
+
+      if (!capabilityMap[Level1]) {
+        capabilityMap[Level1] = {
+          id: Level1_ID || "",
+          desc: Level1_Desc || "",
+          score: 0,
+          children: {},
+        };
+      }
+
+      const level1 = capabilityMap[Level1];
+
+      if (Level2) {
+        if (!level1.children[Level2]) {
+          level1.children[Level2] = {
+            id: Level2_ID || "",
+            desc: Level2_Desc || "",
+            score: 0,
+            children: {},
+          };
+        }
+
+        const level2 = level1.children[Level2];
+
+        if (Level3) {
+          if (!level2.children[Level3]) {
+            level2.children[Level3] = {
+              id: Level3_ID || "",
+              desc: Level3_Desc || "",
+              score: 0,
+              children: {},
+            };
+          }
+
+          const level3 = level2.children[Level3];
+
+          if (Level4) {
+            if (!level3.children[Level4]) {
+              level3.children[Level4] = {
+                id: Level4_ID || "",
+                desc: Level4_Desc || "",
+                score: Number(Score),
+              };
+            } else {
+              level3.children[Level4].score = Number(Score);
+            }
+          }
+        }
+      }
+    });
+
+    return capabilityMap;
+  };
+
+  /**
+   * Determines the padding class based on the capability level.
+   * @param {number} level - The level of the capability (1-4).
+   * @returns {string} - The corresponding padding class.
+   */
+  const getPaddingClass = (level) => {
+    switch (level) {
+      case 1:
+        return "pl-2";
+      case 2:
+        return "pl-4";
+      case 3:
+        return "pl-6";
+      case 4:
+        return "pl-8";
+      default:
+        return "pl-0";
+    }
+  };
+
+  /**
+   * Determines the background color class based on the score.
+   * @param {number} score - The score value.
+   * @returns {string} - The corresponding Tailwind CSS background color class.
+   */
+  const getScoreColor = (score) => {
+    if (score === 0) return "bg-gray-400";
+    if (score >= 85) return "bg-green-500";
+    if (score >= 70) return "bg-yellow-500";
+    return "bg-red-500";
+  };
+
+  /**
+   * Renders the score as a colored heatmap box.
+   * @param {number} score - The score value.
+   * @returns JSX Element representing the score box.
+   */
+  const renderScoreBox = (score) =>
+    showHeatMap ? (
+      <div className={`w-8 h-8 rounded ${getScoreColor(score)}`}></div>
+    ) : null;
+
+  /**
+   * Highlights the matching text based on the search query.
+   * @param {string} text - The text to highlight.
+   * @param {string} query - The search query.
+   * @returns JSX Element with highlighted text.
+   */
+  const highlightText = (text, query) => {
+    if (!query) return text;
+    const regex = new RegExp(`(${query})`, "gi");
+    const parts = text.split(regex);
+    return (
+      <>
+        {parts.map((part, index) =>
+          regex.test(part) ? (
+            <span key={index} className="bg-yellow-200">
+              {part}
+            </span>
+          ) : (
+            part
+          )
+        )}
+      </>
+    );
+  };
+
+  /**
+   * Filters capabilities based on search query and maxLevel.
+   * @param {object} capabilities - The capabilities object.
+   * @param {string} query - The search query.
+   * @returns {object} - The filtered capabilities object.
+   */
+  const filterCapabilities = (capabilities, query) => {
+    if (!query.trim()) return capabilities;
+
+    const lowerCaseQuery = query.toLowerCase();
+    const filtered = {};
+
+    Object.entries(capabilities).forEach(([level1Name, level1Data]) => {
+      const level1Match =
+        level1Name.toLowerCase().includes(lowerCaseQuery) ||
+        level1Data.desc.toLowerCase().includes(lowerCaseQuery);
+
+      const filteredLevel1 = {
+        ...level1Data,
+        children: {},
+        matched: level1Match,
+      };
+      let hasChildMatch = false;
+
+      if (level1Data.children) {
+        Object.entries(level1Data.children).forEach(
+          ([level2Name, level2Data]) => {
+            const level2Match =
+              level2Name.toLowerCase().includes(lowerCaseQuery) ||
+              level2Data.desc.toLowerCase().includes(lowerCaseQuery);
+
+            const filteredLevel2 = {
+              ...level2Data,
+              children: {},
+              matched: level2Match,
+            };
+            let hasGrandChildMatch = false;
+
+            if (level2Data.children && maxLevel >= 3) {
+              Object.entries(level2Data.children).forEach(
+                ([level3Name, level3Data]) => {
+                  if (maxLevel < 3) return;
+
+                  const level3Match =
+                    level3Name.toLowerCase().includes(lowerCaseQuery) ||
+                    level3Data.desc.toLowerCase().includes(lowerCaseQuery);
+
+                  const filteredLevel3 = {
+                    ...level3Data,
+                    children: {},
+                    matched: level3Match,
+                  };
+                  let hasGreatGrandChildMatch = false;
+
+                  if (level3Data.children && maxLevel >= 4) {
+                    Object.entries(level3Data.children).forEach(
+                      ([level4Name, level4Data]) => {
+                        if (maxLevel < 4) return;
+
+                        const level4Match =
+                          level4Name.toLowerCase().includes(lowerCaseQuery) ||
+                          level4Data.desc
+                            .toLowerCase()
+                            .includes(lowerCaseQuery);
+
+                        if (level4Match) {
+                          filteredLevel3.children[level4Name] = {
+                            ...level4Data,
+                            matched: true,
+                          };
+                          hasGreatGrandChildMatch = true;
+                        }
+                      }
+                    );
+                  }
+
+                  if (level3Match || hasGreatGrandChildMatch) {
+                    filteredLevel2.children[level3Name] = filteredLevel3;
+                    hasGrandChildMatch = true;
+                  }
+                }
+              );
+            }
+
+            if (level2Match || hasGrandChildMatch) {
+              filteredLevel1.children[level2Name] = filteredLevel2;
+              hasChildMatch = true;
+            }
+          }
+        );
+      }
+
+      if (level1Match || hasChildMatch) {
+        filtered[level1Name] = filteredLevel1;
+      }
+    });
+
+    return filtered;
+  };
+
+  // Memoize the filtered capabilities for performance optimization
+  const displayedCapabilities = useMemo(() => {
+    return filterCapabilities(capabilities, searchQuery);
+  }, [capabilities, searchQuery, maxLevel]);
+
+  /**
    * Computes default colors for Level 1 columns based on the number of domains.
-   * This ensures a distinct color for each Level1 capability
+   * @returns {object} - An object mapping Level1 domains to their colors.
    */
   const defaultLevel1ColorsComputed = useMemo(() => {
-    // Placeholder: This will be computed inside CapabilityMap based on displayedCapabilities
-    // Since CapabilityMap handles its own color assignments based on displayedCapabilities,
-    // we don't need to compute it here. We'll pass the defaultColors to CapabilityMap.
-    return {};
-  }, []);
+    const level1Domains = Object.keys(displayedCapabilities);
+    const N = level1Domains.length;
+    const M = defaultColors.length;
+    const defaultColorsForDomains = {};
+
+    if (N === 1) {
+      defaultColorsForDomains[level1Domains[0]] = defaultColors[0];
+    } else {
+      for (let i = 0; i < N; i++) {
+        const domain = level1Domains[i];
+        const colorIndex = Math.round((i * (M - 1)) / (N - 1));
+        defaultColorsForDomains[domain] = defaultColors[colorIndex];
+      }
+    }
+    return defaultColorsForDomains;
+  }, [displayedCapabilities, defaultColors]);
+
+  /**
+   * Renders a capability row with proper indentation and styling.
+   * @param {string} name - The name of the capability.
+   * @param {object} data - The data object of the capability.
+   * @param {number} level - The level of the capability (1-4).
+   * @param {string} className - Additional CSS classes.
+   * @param {object} style - Inline styles.
+   * @returns JSX Element representing the capability row.
+   */
+  const renderCapabilityRow = (
+    name,
+    data,
+    level,
+    className = "",
+    style = {}
+  ) => {
+    const paddingClass = getPaddingClass(level);
+
+    // Tooltip positioning: always below the text
+    const tooltipPositionClass = "top-full mt-2 left-0";
+
+    // Determine margin-right for the heat map color box based on level
+    let heatmapMarginRight = "0px";
+    switch (level) {
+      case 1:
+        heatmapMarginRight = "39px";
+        break;
+      case 2:
+        heatmapMarginRight = "13px";
+        break;
+      case 3:
+        heatmapMarginRight = "4px";
+        break;
+      default:
+        heatmapMarginRight = "0px";
+    }
+
+    return (
+      <div
+        className={`flex items-center relative group ${className}`}
+        style={style}
+      >
+        <div
+          className={`flex-1 ${paddingClass} overflow-hidden overflow-ellipsis flex items-center`}
+        >
+          {/* Highlight matching text */}
+          <span className={`whitespace-nowrap font-semibold`}>
+            {highlightText(name, searchQuery)}
+          </span>
+          {/* Display the capability ID */}
+          <span className="text-gray-500 ml-2">{data.id}</span>
+        </div>
+        {/* Render the score heatmap */}
+        <div
+          className="flex-shrink-0 ml-2"
+          style={{ marginRight: heatmapMarginRight }}
+        >
+          {renderScoreBox(data.score)}
+        </div>
+        {/* Tooltip displaying the capability description */}
+        <div
+          className={`absolute z-10 bg-black text-white p-2 rounded text-xs w-48 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none ${tooltipPositionClass}`}
+          role="tooltip"
+        >
+          {data.desc}
+        </div>
+      </div>
+    );
+  };
+
+  /**
+   * Renders Level4 capabilities.
+   * @param {object} capabilities - The Level4 capabilities.
+   * @returns JSX Element representing Level4 capabilities.
+   */
+  const renderLevel4 = (capabilities) => {
+    return Object.entries(capabilities).map(([name, data]) => (
+      <div key={name} className="p-1 border-l-2 border-gray-200 ml-2">
+        {renderCapabilityRow(name, data, 4, "text-xs")}
+      </div>
+    ));
+  };
+
+  /**
+   * Renders Level3 capabilities.
+   * @param {object} capabilities - The Level3 capabilities.
+   * @returns JSX Element representing Level3 capabilities.
+   */
+  const renderLevel3 = (capabilities) => {
+    if (maxLevel < 3) return null;
+
+    return Object.entries(capabilities).map(([name, data]) => {
+      return (
+        <div key={name} className="p-2 border rounded">
+          {renderCapabilityRow(
+            name,
+            data,
+            3,
+            "text-sm font-medium text-gray-800"
+          )}
+          {/* Render Level4 capabilities if available and maxLevel allows */}
+          {data.children &&
+            maxLevel >= 4 &&
+            Object.keys(data.children).length > 0 && (
+              <div className="mt-2">{renderLevel4(data.children)}</div>
+            )}
+        </div>
+      );
+    });
+  };
+
+  /**
+   * Renders Level2 capabilities.
+   * @param {object} capabilities - The Level2 capabilities.
+   * @returns JSX Element representing Level2 capabilities.
+   */
+  const renderLevel2 = (capabilities) => {
+    return Object.entries(capabilities).map(([name, data]) => {
+      return (
+        <div key={name} className="border rounded p-2 bg-gray-50 mb-4">
+          {renderCapabilityRow(name, data, 2, "font-medium mb-2 text-gray-800")}
+          {/* Render Level3 capabilities if available */}
+          {data.children && Object.keys(data.children).length > 0 && (
+            <div className="grid grid-cols-1 gap-2">
+              {renderLevel3(data.children)}
+            </div>
+          )}
+        </div>
+      );
+    });
+  };
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -774,6 +1170,9 @@ export default function Page() {
       {/* Main Content */}
       <main className="flex-1 p-6 overflow-x-auto">
         <CapabilityMap
+          capabilities={capabilities}
+          loading={loading}
+          error={error}
           searchQuery={searchQuery}
           showHeatMap={showHeatMap}
           maxLevel={maxLevel}
@@ -808,11 +1207,11 @@ export default function Page() {
         <div className="fixed inset-0 flex justify-center items-center z-50">
           {/* Overlay to darken the background */}
           <div
-            className="fixed inset-0 bg-black opacity-50"
+            className="fixed inset-0 bg-black opacity-50 z-40"
             onClick={() => setIsColorPanelOpen(false)} // Close panel on overlay click
           ></div>
           {/* Color customization panel */}
-          <div className="bg-white w-full max-w-md p-6 rounded-lg shadow-lg z-60">
+          <div className="bg-white w-full max-w-md p-6 rounded-lg shadow-lg z-50">
             {/* Panel Header */}
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-semibold">
