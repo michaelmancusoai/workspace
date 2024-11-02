@@ -533,6 +533,10 @@ const Page = () => {
     fetchCSV();
   }, []);
 
+  const effectiveMaxLevel = useMemo(() => {
+    return searchQuery.trim() !== "" ? 4 : maxLevel;
+  }, [searchQuery, maxLevel]);
+
   return (
     <div className="flex flex-col min-h-screen">
       <Header
@@ -553,7 +557,7 @@ const Page = () => {
           error={error}
           searchQuery={searchQuery}
           showHeatMap={showHeatMap}
-          maxLevel={maxLevel}
+          maxLevel={effectiveMaxLevel}
           level1Colors={level1Colors}
           handleColorChange={handleColorChange}
         />
