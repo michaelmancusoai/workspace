@@ -1,7 +1,13 @@
 // app/page.jsx
 "use client";
 
-import React, { useEffect, useState, useMemo } from "react";
+import React, {
+  useEffect,
+  useState,
+  useMemo,
+  useRef,
+  useLayoutEffect,
+} from "react";
 import Papa from "papaparse";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
@@ -39,6 +45,20 @@ const isValidHexColor = (hex) => {
   return /^#([0-9A-F]{3}){1,2}$/i.test(hex);
 };
 
+// Function to get dynamic margin based on level
+const getHeatmapMarginRight = (level) => {
+  switch (level) {
+    case 1:
+      return "39px"; // Align with lower levels
+    case 2:
+      return "13px";
+    case 3:
+      return "4px";
+    default:
+      return "0px";
+  }
+};
+
 // CapabilityMap Component
 const CapabilityMap = ({
   capabilities,
@@ -47,8 +67,6 @@ const CapabilityMap = ({
   searchQuery,
   showHeatMap,
   maxLevel,
-  level1Colors,
-  handleColorChange,
 }) => {
   // List of default colors for Level 1 columns
   const defaultColors = useMemo(
@@ -76,6 +94,24 @@ const CapabilityMap = ({
     ],
     []
   );
+
+  const defaultLevel1ColorsComputed = useMemo(() => {
+    const level1Domains = Object.keys(capabilities);
+    const N = level1Domains.length;
+    const M = defaultColors.length;
+    const defaultColorsForDomains = {};
+
+    if (N === 1) {
+      defaultColorsForDomains[level1Domains[0]] = defaultColors[0];
+    } else {
+      for (let i = 0; i < N; i++) {
+        const domain = level1Domains[i];
+        const colorIndex = Math.round((i * (M - 1)) / (N - 1));
+        defaultColorsForDomains[domain] = defaultColors[colorIndex];
+      }
+    }
+    return defaultColorsForDomains;
+  }, [capabilities, defaultColors]);
 
   const getPaddingClass = (level) => {
     switch (level) {
@@ -206,24 +242,33 @@ const CapabilityMap = ({
     return filterCapabilitiesFunc(capabilities, searchQuery);
   }, [capabilities, searchQuery, maxLevel]);
 
-  const defaultLevel1ColorsComputed = useMemo(() => {
-    const level1Domains = Object.keys(displayedCapabilities);
-    const N = level1Domains.length;
-    const M = defaultColors.length;
-    const defaultColorsForDomains = {};
+  // Refs for each column
+  const columnsRef = useRef([]);
+  // State to store the uniform column width
+  const [columnWidth, setColumnWidth] = useState(null);
 
-    if (N === 1) {
-      defaultColorsForDomains[level1Domains[0]] = defaultColors[0];
-    } else {
-      for (let i = 0; i < N; i++) {
-        const domain = level1Domains[i];
-        const colorIndex = Math.round((i * (M - 1)) / (N - 1));
-        defaultColorsForDomains[domain] = defaultColors[colorIndex];
-      }
+  // Measure column widths and set uniform width
+  useLayoutEffect(() => {
+    if (capabilities && Object.keys(capabilities).length > 0) {
+      // Reset the ref array
+      columnsRef.current = columnsRef.current.slice(
+        0,
+        Object.keys(capabilities).length
+      );
+
+      // Measure widths
+      const widths = columnsRef.current.map((col) =>
+        col ? col.scrollWidth : 0
+      );
+      const maxContentWidth = Math.max(...widths);
+      const maxWidth = 550;
+      const finalWidth =
+        maxContentWidth > maxWidth ? maxWidth : maxContentWidth;
+      setColumnWidth(finalWidth);
     }
-    return defaultColorsForDomains;
-  }, [displayedCapabilities, defaultColors]);
+  }, [capabilities, searchQuery, maxLevel]);
 
+  // Render a single capability row
   const renderCapabilityRow = (
     name,
     data,
@@ -236,22 +281,37 @@ const CapabilityMap = ({
         className={`flex items-center relative group ${className}`}
         style={style}
       >
-        <div
-          className={`flex-1 ${getPaddingClass(
-            level
-          )} overflow-hidden overflow-ellipsis flex items-center`}
-        >
-          <span className={`whitespace-nowrap font-semibold`}>
+        {/* Text Container */}
+        <div className="flex-1 pl-2 flex items-center overflow-hidden min-w-0">
+          {/* Level 1 Title */}
+          <span
+            className={`font-semibold whitespace-nowrap mr-2 ${
+              columnWidth === 550 ? "truncate" : ""
+            }`}
+            title={name}
+          >
             {highlightTextFunc(name, searchQuery)}
           </span>
-          <span className="text-gray-500 ml-2">{data.id}</span>
+          {/* ID */}
+          <span
+            className={`text-gray-500 whitespace-nowrap ${
+              columnWidth === 550 ? "truncate" : ""
+            }`}
+            title={data.id}
+          >
+            {data.id}
+          </span>
         </div>
+
+        {/* Heat Map Box */}
         <div
-          className="flex-shrink-0 ml-2"
+          className="flex-shrink-0 ml-2 w-8 h-8"
           style={{ marginRight: getHeatmapMarginRight(level) }}
         >
           {renderScoreBox(data.score)}
         </div>
+
+        {/* Tooltip */}
         <div
           className={`absolute z-10 bg-black text-white p-2 rounded text-xs w-48 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none top-full mt-2 left-0`}
           role="tooltip"
@@ -260,19 +320,6 @@ const CapabilityMap = ({
         </div>
       </div>
     );
-  };
-
-  const getHeatmapMarginRight = (level) => {
-    switch (level) {
-      case 1:
-        return "39px";
-      case 2:
-        return "13px";
-      case 3:
-        return "4px";
-      default:
-        return "0px";
-    }
   };
 
   const renderLevel4 = (capabilities) => {
@@ -344,14 +391,19 @@ const CapabilityMap = ({
     <div>
       <div className="flex gap-6 flex-nowrap">
         {Object.entries(displayedCapabilities).map(([domain, data], index) => {
-          const rawColor =
-            level1Colors[domain] || defaultLevel1ColorsComputed[domain];
-          const backgroundColor = isValidHexColor(rawColor)
-            ? rawColor
-            : defaultLevel1ColorsComputed[domain] || "transparent";
+          const backgroundColor =
+            defaultLevel1ColorsComputed[domain] || "transparent";
 
           return (
-            <div key={domain} className="flex flex-col min-w-[450px]">
+            <div
+              key={domain}
+              className="flex flex-col flex-shrink-0"
+              ref={(el) => (columnsRef.current[index] = el)}
+              style={{
+                width: columnWidth ? `${columnWidth}px` : "auto",
+                maxWidth: "550px",
+              }}
+            >
               {renderCapabilityRow(
                 domain,
                 data,
@@ -385,44 +437,9 @@ const Page = () => {
   const [showHeatMap, setShowHeatMap] = useState(true);
   const [maxLevel, setMaxLevel] = useState(2);
   const [searchQuery, setSearchQuery] = useState("");
-  const [isColorPanelOpen, setIsColorPanelOpen] = useState(false);
-  const [level1Colors, setLevel1Colors] = useState({});
   const [capabilities, setCapabilities] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-
-  const defaultColors = useMemo(
-    () => [
-      "#8B246E",
-      "#7A1C68",
-      "#7A1A1A",
-      "#B34700",
-      "#8B3E00",
-      "#A1421F",
-      "#B8860B",
-      "#7D6608",
-      "#6F4E37",
-      "#2C6A0E",
-      "#556B2F",
-      "#394D2D",
-      "#0F4C5C",
-      "#003366",
-      "#274B61",
-      "#001F3F",
-      "#3A306B",
-      "#00205C",
-      "#001B4D",
-      "#4B3069",
-    ],
-    []
-  );
-
-  const handleColorChange = (level1Name, color) => {
-    setLevel1Colors((prevColors) => ({
-      ...prevColors,
-      [level1Name]: color,
-    }));
-  };
 
   const buildNestedCapabilities = (rows) => {
     const capabilityMap = {};
@@ -550,6 +567,7 @@ const Page = () => {
 
       <div className="h-24"></div>
 
+      {/* Handle overflow in main container only */}
       <main className="flex-1 p-6 overflow-y-auto overflow-x-auto">
         <CapabilityMap
           capabilities={capabilities}
@@ -558,86 +576,12 @@ const Page = () => {
           searchQuery={searchQuery}
           showHeatMap={showHeatMap}
           maxLevel={effectiveMaxLevel}
-          level1Colors={level1Colors}
-          handleColorChange={handleColorChange}
         />
       </main>
 
-      <Footer
-        isColorPanelOpen={isColorPanelOpen}
-        setIsColorPanelOpen={setIsColorPanelOpen}
-      />
+      <Footer />
 
       <div className="h-16"></div>
-
-      {isColorPanelOpen && (
-        <div className="fixed inset-0 flex justify-center items-center z-50">
-          <div
-            className="fixed inset-0 bg-black opacity-50 z-40"
-            onClick={() => setIsColorPanelOpen(false)}
-          ></div>
-          <div className="bg-white w-full max-w-md p-6 rounded-lg shadow-lg z-50">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold">
-                Customize Level 1 Colors
-              </h2>
-              <button
-                onClick={() => setIsColorPanelOpen(false)}
-                className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
-              >
-                ×
-              </button>
-            </div>
-            <div className="space-y-4 max-h-80 overflow-y-auto">
-              {Object.keys(capabilities).map((level1Name) => (
-                <div
-                  key={level1Name}
-                  className="flex items-center justify-between"
-                >
-                  <span className="font-medium">{level1Name}</span>
-                  <div className="flex items-center">
-                    <input
-                      type="color"
-                      value={
-                        isValidHexColor(level1Colors[level1Name])
-                          ? level1Colors[level1Name]
-                          : defaultLevel1ColorsComputed[level1Name] || "#ffffff"
-                      }
-                      onChange={(e) =>
-                        handleColorChange(level1Name, e.target.value)
-                      }
-                      className="w-10 h-10 border rounded"
-                    />
-                    <input
-                      type="text"
-                      value={level1Colors[level1Name] || ""}
-                      onChange={(e) =>
-                        handleColorChange(level1Name, e.target.value)
-                      }
-                      className={`w-24 border rounded ml-2 ${
-                        isValidHexColor(level1Colors[level1Name])
-                          ? ""
-                          : "border-red-500"
-                      }`}
-                      placeholder={
-                        defaultLevel1ColorsComputed[level1Name] || "#ffffff"
-                      }
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="mt-6 flex justify-end">
-              <button
-                onClick={() => setIsColorPanelOpen(false)}
-                className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
