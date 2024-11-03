@@ -41,21 +41,21 @@ const Dropdown = () => {
               className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
               role="menuitem"
             >
-              Option 1
+              Example Capability Map v1
             </a>
             <a
               href="#"
               className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
               role="menuitem"
             >
-              Option 2
+              Example Capability Map v2
             </a>
             <a
               href="#"
               className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
               role="menuitem"
             >
-              Option 3
+              Other Capability Map
             </a>
           </div>
         </div>
